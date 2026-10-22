@@ -162,6 +162,34 @@ input[type=text]{width:100%;padding:11px;border-radius:10px;border:1px solid var
   }
   function loadImg(url){return new Promise(function(res){var i=new Image();i.onload=function(){res(i)};i.onerror=function(){res(null)};i.src=url})}
 
+  // ---------- SVG / HTML-with-SVG outputs (e.g. spaCy displacy) -> PNG ----------
+  function extractSvgs(html){
+    try{
+      var d=new DOMParser().parseFromString(html,"text/html"), out=[];
+      [].forEach.call(d.querySelectorAll("svg"),function(el){ if(!(el.parentNode&&el.parentNode.closest&&el.parentNode.closest("svg"))) out.push(new XMLSerializer().serializeToString(el)) });
+      return out;
+    }catch(e){return []}
+  }
+  async function svgToImg(str){
+    try{
+      var doc=new DOMParser().parseFromString(str,"image/svg+xml"), el=doc.documentElement;
+      if(!el||el.nodeName.toLowerCase()!=="svg"||doc.querySelector("parsererror")) return null;
+      [].forEach.call(el.querySelectorAll("script,foreignObject"),function(n){n.remove()});
+      var vb=(el.getAttribute("viewBox")||"").trim().split(/[\s,]+/).map(parseFloat), hasVB=vb.length===4&&vb[2]>0&&vb[3]>0;
+      var wa=el.getAttribute("width")||"", ha=el.getAttribute("height")||"";
+      var w=/%$/.test(wa)?NaN:parseFloat(wa), h=/%$/.test(ha)?NaN:parseFloat(ha);
+      if(!(w>0)) w=hasVB?vb[2]:800;
+      if(!(h>0)) h=hasVB?vb[3]*(w/vb[2]):400;
+      el.setAttribute("width",w); el.setAttribute("height",h);
+      var url="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(new XMLSerializer().serializeToString(el)), img=await loadImg(url);
+      if(!img) return null;
+      var s=Math.min(3,4096/Math.max(w,h)), c=document.createElement("canvas"); c.width=Math.max(1,Math.round(w*s)); c.height=Math.max(1,Math.round(h*s));
+      var x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height);
+      var data=c.toDataURL("image/png"), el2=await loadImg(data);
+      return el2?{k:"img",data:data,fmt:"PNG",el:el2,w:w,h:h}:null;
+    }catch(e){return null}
+  }
+
   // ---------- notebook -> simple model ----------
   async function normalize(name,nb){
     var cells=[], list=nb.cells||((nb.worksheets&&nb.worksheets[0]&&nb.worksheets[0].cells)||[]);
@@ -181,6 +209,12 @@ input[type=text]{width:100%;padding:11px;border-radius:10px;border:1px solid var
             if(png||jpg){
               var b64=join(png||jpg).replace(/\s/g,""), fmt=png?"PNG":"JPEG", url="data:image/"+(png?"png":"jpeg")+";base64,"+b64, el=await loadImg(url);
               if(el){ cell.outs.push({k:"img",data:url,fmt:fmt,el:el,w:el.naturalWidth,h:el.naturalHeight}); got=true }
+            }
+            if(!got){
+              var svgs=[];
+              if(d["image/svg+xml"]) svgs.push(join(d["image/svg+xml"]));
+              else if(d["text/html"]!=null){ var hh=join(d["text/html"]); if(/<svg[\s>]/i.test(hh)) svgs=extractSvgs(hh) }
+              for(var si=0;si<svgs.length;si++){ var sim=await svgToImg(svgs[si]); if(sim){ cell.outs.push(sim); got=true } }
             }
             if(!got){
               var txt=d["text/plain"]!=null?join(d["text/plain"]):(d["text/html"]!=null?htmlToText(join(d["text/html"])):(d["text/markdown"]!=null?join(d["text/markdown"]):""));
