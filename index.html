@@ -492,7 +492,7 @@ input[type=text]{width:100%;padding:11px;border-radius:10px;border:1px solid var
           items.forEach(function(it){
             if(it.k==="b"){ doc.setFillColor(it.fill[0],it.fill[1],it.fill[2]); doc.setLineWidth(0.25); var sty="F"; if(it.stroke){doc.setDrawColor(it.stroke[0],it.stroke[1],it.stroke[2]);sty="FD"}
               if(it.r>0) doc.roundedRect(it.x,it.y,it.w,it.h,it.r,it.r,sty); else doc.rect(it.x,it.y,it.w,it.h,sty) }
-            else if(it.k==="i"){ doc.addImage(it.data,it.fmt,it.x,it.y,it.w,it.h,undefined,"NONE") }
+            else if(it.k==="i"){ doc.addImage(it.data,it.fmt,it.x,it.y,it.w,it.h,undefined,"FAST") }
             else if(it.k==="o"){ doc.setFillColor(it.c[0],it.c[1],it.c[2]); doc.circle(it.x,it.y,it.r,"F") }
             else if(it.k==="l"){ doc.setDrawColor(it.c[0],it.c[1],it.c[2]); doc.setLineWidth(it.lw); doc.line(it.x1,it.y1,it.x2,it.y2) }
             else{
